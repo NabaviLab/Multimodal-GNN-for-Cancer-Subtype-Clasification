@@ -4,3 +4,5 @@ This is the code for the paper, [A Multimodal Graph Neural Network Framework for
 
 ## Get started
 The complete conda enviroment list is in `enviroment.yml` file.
+
+## Demo
