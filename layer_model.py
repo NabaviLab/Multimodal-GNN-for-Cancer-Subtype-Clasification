@@ -15,7 +15,6 @@ from torch_geometric.datasets import Planetoid
 from torch_geometric.datasets import MNISTSuperpixels
 
 import torch_geometric.transforms as T
-from self_attention import SAGPool
 
 # num_genes = 1000
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -28,7 +27,6 @@ class GAT(torch.nn.Module):
                     l2, 
                     decoder, 
                     poolsize, 
-                    self_attention,
                     poolrate,
                     edge_weights, 
                     edge_attributes, 
@@ -45,7 +43,6 @@ class GAT(torch.nn.Module):
         self.decoder = decoder
         self.l2 = l2
         self.poolsize = poolsize
-        self.self_attention = self_attention
         self.poolrate = poolrate
         self.edge_weights = edge_weights
         self.edge_attributes = edge_attributes
@@ -80,11 +77,6 @@ class GAT(torch.nn.Module):
                 self.conv2 = GATv2Conv(self.hid * self.head, self.hid, heads=self.head)
                 # self.conv3 = GATv2Conv(self.hid * self.head, self.hid, heads=self.head, dropout=dropout_rate)
 
-            ## if include the self-attention pooling layer in the model
-            # if self.self_attention:
-            #     self.pool1 = SAGPool(self.hid * self.head, ratio=self.poolrate)
-            #     self.pool2 = SAGPool(self.hid * self.head, ratio=self.poolrate)
-
         elif method == 'gat':
             if self.edge_attributes:
                 self.conv1 = GATConv(self.raised_dimension, self.hid, heads=self.head, edge_dim=2)
@@ -96,29 +88,6 @@ class GAT(torch.nn.Module):
                 self.conv1 = GATConv(self.raised_dimension, self.hid, heads=self.head)
                 self.conv2 = GATConv(self.hid * self.head, self.hid, heads=self.head)
 
-            ## if include the self-attention pooling layer in the model
-            # if self.self_attention:
-            #     self.pool1 = SAGPool(self.hid * self.head, ratio=self.poolrate)
-            #     self.pool2 = SAGPool(self.hid * self.head, ratio=self.poolrate)
-
-        
-        # if self.poolsize <= 1:
-        #     if method == 'gcn':
-        #         if self.self_attention:
-        #             self.linear_input = self.num_nodes * self.hid * 2
-        #         else:
-        #             self.linear_input = self.num_nodes * self.hid
-        #     else:
-        #         print('Only GCN model can use self-attention now.')
-        #         quit()
-        #         # if self.self_attention:
-        #         #     self.linear_input = self.num_nodes * self.hid * self.head * 2
-        #         # else:
-        #         #     self.linear_input = self.num_nodes * self.hid * self.head
-        # else:
-        #     if method == 'gcn':
-        #         self.linear_input = math.floor(self.num_nodes / self.poolsize) * self.hid
-        #     else:
         self.linear_input = math.floor((self.num_gene + self.num_mirna) / self.poolsize) * self.hid * self.head
         print(self.linear_input)
 
@@ -350,7 +319,6 @@ class GCN(torch.nn.Module):
                     l2, 
                     decoder, 
                     poolsize, 
-                    self_attention,
                     poolrate,
                     edge_weights, 
                     edge_attributes, 
@@ -367,7 +335,6 @@ class GCN(torch.nn.Module):
         self.decoder = decoder
         self.l2 = l2
         self.poolsize = poolsize
-        self.self_attention = self_attention
         self.poolrate = poolrate
         self.edge_weights = edge_weights
         self.edge_attributes = edge_attributes
@@ -391,17 +358,9 @@ class GCN(torch.nn.Module):
             self.conv1 = ChebConv(self.raised_dimension, self.hid, K=5)
             self.conv2 = ChebConv(self.hid, self.hid, K=5)
 
-            ## if include the self-attention pooling layer in the model
-            if self.self_attention:
-                self.pool1 = SAGPool(self.hid, ratio=self.poolrate)
-                self.pool2 = SAGPool(self.hid, ratio=self.poolrate)
-
         if self.poolsize <= 1:
             if method == 'gcn':
-                if self.self_attention:
-                    self.linear_input = (self.num_gene + self.num_mirna) * self.hid * 2
-                else:
-                    self.linear_input = (self.num_gene + self.num_mirna) * self.hid
+                self.linear_input = (self.num_gene + self.num_mirna) * self.hid
         else:
             if method == 'gcn':
                 self.linear_input = math.floor((self.num_gene + self.num_mirna) / self.poolsize) * self.hid
@@ -500,122 +459,41 @@ class GCN(torch.nn.Module):
         # print(x.shape)
         x = x.view(-1, self.raised_dimension)
         x_parallel = x_parallel.view(batches,-1)
-        # x = x.view(-1,1)
-        # print('Reformated data shape')
-        # print(x.shape)
 
-        # x = F.dropout(x, p=0.8, training=self.training)
-        # print('after first dropout:')
-        # print(x.shape, edge_index.shape)
-        # print(torch.max(edge_index))
         if self.edge_weights:
-            # print(edge_index.type())
-            # print(edge_weight.type())
-            # print(x.type())
-            # print('Passing through Conv1 layer with edge_weight.')
             x = self.conv1(x, edge_index, edge_weight)
 
             x = F.relu(x)
-
-            ## if want to use self-attention pooling layer after conv layer 1
-            if self.self_attention:
-                ## pass through the self-attention layer
-                # print('Passing through the self-attention layer 1')
-                # print('with edge weight')
-                # print(x.shape)
-                # print(edge_index.shape)
-                # print(edge_weight.shape)
-                # print(self.create_batch_index(batches).shape)
-                x, edge_index, edge_weight, batch, _ = self.pool1(x, edge_index, edge_weight, self.create_batch_index(batches))
-                x1 = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
         else:
-            # print('Passing through Conv1 layer without edge_weight.')
             x = self.conv1(x, edge_index)
 
             x = F.relu(x)
 
-            if self.self_attention:
-                ## pass through the self-attention layer 1
-                # print('Passing through the self-attention layer 1')
-                # print('without edge weight')
-                # print(x.shape) ## [batch * num_node, num_hid]
-                # print(edge_index.shape) ## [2, edges in one graph * batch]
-                # print(edge_weight.shape) ## []
-                # print(self.create_batch_index(batches).shape) ## [batch * num_node]
-                x, edge_index, _, batch, _ = self.pool1(x, edge_index, None, self.create_batch_index(batches))
-                x1 = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
-                # print(x1.shape) ## [?, 2 * num_hid]
-                # print(edge_index.shape) ## [2, poolrate*]
-                # print(batch.shape)
-        
-        # x = F.dropout(x, p=0.6, training=self.training)
-
-        # print(x.shape)
         if self.edge_weights:
             # print('Passing through Conv2 layer with edge_weight.')
             x = self.conv2(x, edge_index, edge_weight)
 
             x = F.relu(x)
             
-            if self.self_attention:
-                ## pass through the self-attention layer
-                # print('Passing through the self-attention layer 2')
-                # print('with edge weight')
-                x, edge_index, edge_weight, batch, _ = self.pool2(x, edge_index, edge_weight, batch)
-                x2 = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
         else:
             # print('Passing through Conv2 layer without edge_weight.')
             x = self.conv2(x, edge_index) ## output shape: [batches * num_node, hid * head]
 
             x = F.relu(x)
 
-            if self.self_attention:
-                ## pass through the self-attention layer
-                # print('Passing through the self-attention layer 2')
-                # print('without edge weight')
-                x, edge_index, _, batch, _ = self.pool2(x, edge_index, None, batch)
-                x2 = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
-                # print(x2.shape)
-                # print(edge_index.shape)
-                # print(batch.shape)
-        # print(x.shape)
-
         ## pooling on the graph to reduce nodes
-        # print(x.shape)
-        if self.self_attention:
-            ## if use self-attention pooling then the output has the dimension: [unmasked_nodes, hid * head * 2]
-            x = x1 + x2
-        else:
-            x = x.view(batches, num_node, -1) ## output shape: [batches, num_node, hid * head]
-            x = self.graph_max_pool(x, self.poolsize)   ## if "gat", then output shape: [batches, floor(num_node / poolsize), hid * head]
-                                                        ## if "gcn", then output shape: [batches, floor(num_node / poolsize), hid]
-        # print(x.shape)
+        x = x.view(batches, num_node, -1) ## output shape: [batches, num_node, hid * head]
+        x = self.graph_max_pool(x, self.poolsize)   ## if "gat", then output shape: [batches, floor(num_node / poolsize), hid * head]
+                                                    ## if "gcn", then output shape: [batches, floor(num_node / poolsize), hid]
 
         if self.method == 'gcn':
-            if self.self_attention:
-                ## x has the feature dimension of 2 * self.hid as the GMP and GAP concatnation
-                x = x.view(-1, 2 * self.hid)
             x = x.view(-1, self.hid) ## output shape:[batches * floor(num_node / poolsize), hid]
-        # print(x.shape)
-
-        # x = self.conv3(x, edge_index)
-        # x = F.elu(x)
-        # print(x.shape)
-
-        # batch_index = np.array(range(batches))
-        # batch_index = np.repeat(batch_index, num_genes+100)
-        # batch_index = torch.from_numpy(batch_index).to(device)
-        # x = global_mean_pool(x, batch_index)
+        
         x = x.view(batches, -1) ## output size: [batches, floor(num_node / poolsize) * hid * head]
-        # print(x.shape)
         x = self.linear1(x)
         x = F.relu(x)
-        # print(x.shape)
         x = self.linear2(x)
         x = F.relu(x)
-        # print(x.shape)
-        # x = self.linear3(x)
-        # print(x.shape)
 
         if self.decoder:
             # print('Passing decoder')
@@ -682,7 +560,6 @@ class Baseline(torch.nn.Module):
                     l2, 
                     decoder, 
                     poolsize, 
-                    self_attention,
                     poolrate,
                     edge_weights, 
                     edge_attributes, 
@@ -699,7 +576,6 @@ class Baseline(torch.nn.Module):
         self.decoder = decoder
         self.l2 = l2
         self.poolsize = poolsize
-        self.self_attention = self_attention
         self.poolrate = poolrate
         self.edge_weights = edge_weights
         self.edge_attributes = edge_attributes
@@ -794,29 +670,7 @@ class Baseline(torch.nn.Module):
         return F.log_softmax(x_parallel, dim=1)
     
     def loss(self, x_reconstruct, x_target, y, y_target, l2_regularization):
-        # if self.num_mirna == 0 or self.num_features == 1:
-        #     x_target = x_target.view(x_target.size()[0], -1)
-        #     loss1 = nn.MSELoss()(x_reconstruct, x_target)
-        # else:
-        #     x_target_exp_mirna = x_target[:,:,0]
-        #     x_target_cnv = x_target[:,:,1]
-
-        #     ## separate mirna from the rest
-        #     x_target_cnv = x_target_cnv[:,:-100]
-        #     x_target_exp = x_target_exp_mirna[:,:-100]
-        #     x_target_mirna = x_target_exp_mirna[:,-100:]
-        #     x_target_flatten = torch.cat([x_target_exp, x_target_cnv, x_target_mirna], dim=1)
-        #     loss1 = nn.MSELoss()(x_reconstruct, x_target_flatten)
-        
         loss2 = nn.CrossEntropyLoss()(y, y_target)
-        # loss = 1*loss1 + 1*loss2
         loss = 1*loss2
         
-        # if self.l2:
-        #     l2_loss = 0.0
-        #     for param in self.parameters():
-        #         data = param* param
-        #         l2_loss += data.sum()
-
-        #     loss += 0.2* l2_regularization* l2_loss
         return loss

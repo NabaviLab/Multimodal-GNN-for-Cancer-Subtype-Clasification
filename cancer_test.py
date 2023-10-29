@@ -48,7 +48,6 @@ parser.add_argument('--dropout', type=float, default = 0.6, help='dropout rate')
 parser.add_argument('--model', type=str, default = 'gat', choices=['gat','gatv2','gcn','multi-gcn','baseline'], help='which model to use')
 parser.add_argument('--decay', type=float, default = 0.9, help='decay rate of the learing rate')
 parser.add_argument('--poolsize', type=int, default = 8, help='the max pooling size')
-parser.add_argument('--self_attention', type=str2bool, default = False, help='if use the self-attention pooling layer')
 parser.add_argument('--poolrate', type=float, default = 0.8, help='the pooling rate used in the self-attention pooling layer')
 parser.add_argument('--gene_gene', type=str2bool, nargs='?', default = True, help='if use the Gene-gene inner connections')
 parser.add_argument('--mirna_gene', type=str2bool, nargs='?', default = True, help='if use mirna-mrna connections')
@@ -216,7 +215,6 @@ if args.model == 'gcn':
                 args.parallel, 
                 args.l2, args.decoder, 
                 args.poolsize, 
-                args.self_attention,
                 args.poolrate,
                 args.edge_weight, 
                 args.edge_attribute, 
@@ -230,7 +228,6 @@ else:
                 args.parallel, 
                 args.l2, args.decoder, 
                 args.poolsize, 
-                args.self_attention,
                 args.poolrate,
                 args.edge_weight, 
                 args.edge_attribute, 
@@ -244,7 +241,6 @@ if args.model == 'baseline':
                 args.parallel, 
                 args.l2, args.decoder, 
                 args.poolsize, 
-                args.self_attention,
                 args.poolrate,
                 args.edge_weight, 
                 args.edge_attribute, 
