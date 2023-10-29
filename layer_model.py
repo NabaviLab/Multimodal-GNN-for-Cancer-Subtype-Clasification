@@ -63,8 +63,6 @@ class GAT(torch.nn.Module):
         self.pre_conv_linear_gene = nn.Linear(self.num_features, self.raised_dimension)
         self.pre_conv_linear_mirna = nn.Linear(1, self.raised_dimension)
 
-        # self.conv1 = GATConv(self.num_features, self.hid, heads=self.head)
-        # self.conv2 = GATConv(self.hid * self.head, self.hid, heads=self.head, dropout=dropout_rate)
         if method == 'gatv2':
             if self.edge_attributes:
                 self.conv1 = GATv2Conv(self.raised_dimension, self.hid, heads=self.head, edge_dim=2)
@@ -75,7 +73,6 @@ class GAT(torch.nn.Module):
             else:
                 self.conv1 = GATv2Conv(self.raised_dimension, self.hid, heads=self.head)
                 self.conv2 = GATv2Conv(self.hid * self.head, self.hid, heads=self.head)
-                # self.conv3 = GATv2Conv(self.hid * self.head, self.hid, heads=self.head, dropout=dropout_rate)
 
         elif method == 'gat':
             if self.edge_attributes:
@@ -92,9 +89,7 @@ class GAT(torch.nn.Module):
         print(self.linear_input)
 
         self.linear1 = nn.Linear(self.linear_input, self.linear_input//4)
-        # self.linear2 = nn.Linear(linear_input//4, linear_input//8)
         self.linear2 = nn.Linear(self.linear_input//4, self.concate_layer)
-        # self.linear3 = nn.Linear(linear_input//8, num_classes)
 
         if self.decoder:
             if self.num_features == 1:
@@ -135,12 +130,6 @@ class GAT(torch.nn.Module):
         return(torch.Tensor(batch_index).type(torch.int64))
         
     def forward(self, x, edge_index, edge_weight):
-        # x = torch.cat([x, pos], dim=-1)
-        
-        # print("Input data shape")
-        # print(x.shape)
-        # print(edge_index.shape)
-
         batches = x.shape[0]
         num_node = x.shape[1]
         
@@ -155,23 +144,19 @@ class GAT(torch.nn.Module):
             ## separate mirna from the rest
             x_cnv = x_cnv[:,:-100]
             x_exp = x_exp_mirna[:,:-100]
-            # print(x_cnv.shape)
-            # print(x_exp.shape)
+
             x_cnv = x_cnv.view(batches,-1,1)
             x_exp = x_exp.view(batches,-1,1)
             x_gene = torch.cat([x_exp,x_cnv],dim=1)
             x_gene = x_gene.view(-1,self.num_features)
             x_mirna = x_exp_mirna[:,-100:]
-            # print(x_mirna.shape)
+
             x_mirna = torch.flatten(x_mirna)
             x_mirna = x_mirna.view(-1, 1)
 
-            # print(x_gene.shape)
             x_gene = self.pre_conv_linear_gene(x_gene)
             x_gene = F.relu(x_gene)
-            # print(x_gene.shape)
 
-            # print(x_mirna.shape)
             x_mirna = self.pre_conv_linear_mirna(x_mirna)
             x_mirna = F.relu(x_mirna)
             # print(x_mirna.shape)
@@ -184,22 +169,10 @@ class GAT(torch.nn.Module):
 
 
         x_parallel = x
-        # print(x.shape)
         x = x.view(-1, self.raised_dimension)
         x_parallel = x_parallel.view(batches,-1)
-        # x = x.view(-1,1)
-        # print('Reformated data shape')
-        # print(x.shape)
 
-        # x = F.dropout(x, p=0.8, training=self.training)
-        # print('after first dropout:')
-        # print(x.shape, edge_index.shape)
-        # print(torch.max(edge_index))
         if self.edge_weights:
-            # print(edge_index.type())
-            # print(edge_weight.type())
-            # print(x.type())
-            # print('Passing through Conv1 layer with edge_weight.')
             x = self.conv1(x, edge_index, edge_weight)
 
             ## use different activation function based on the models
@@ -210,53 +183,30 @@ class GAT(torch.nn.Module):
 
             ## use different activation function based on the models
             x = F.leaky_relu(x)
-        
-        # x = F.dropout(x, p=0.6, training=self.training)
 
-        # print(x.shape)
         if self.edge_weights:
-            # print('Passing through Conv2 layer with edge_weight.')
             x = self.conv2(x, edge_index, edge_weight)
 
             x = F.leaky_relu(x)
         else:
-            # print('Passing through Conv2 layer without edge_weight.')
             x = self.conv2(x, edge_index) ## output shape: [batches * num_node, hid * head]
 
             x = F.leaky_relu(x)
-        # print(x.shape)
 
         ## pooling on the graph to reduce nodes
-        # print(x.shape)
         x = x.view(batches, num_node, -1) ## output shape: [batches, num_node, hid * head]
         x = self.graph_max_pool(x, self.poolsize)   ## if "gat", then output shape: [batches, floor(num_node / poolsize), hid * head]
                                                         ## if "gcn", then output shape: [batches, floor(num_node / poolsize), hid]
-        # print(x.shape)
 
         x = x.view(-1, self.hid * self.head) ## output shape:[batches * floor(num_node / poolsize), hid * head]
-        # print(x.shape)
 
-        # x = self.conv3(x, edge_index)
-        # x = F.elu(x)
-        # print(x.shape)
-
-        # batch_index = np.array(range(batches))
-        # batch_index = np.repeat(batch_index, num_genes+100)
-        # batch_index = torch.from_numpy(batch_index).to(device)
-        # x = global_mean_pool(x, batch_index)
         x = x.view(batches, -1) ## output size: [batches, floor(num_node / poolsize) * hid * head]
-        # print(x.shape)
         x = self.linear1(x)
         x = F.relu(x)
-        # print(x.shape)
         x = self.linear2(x)
         x = F.relu(x)
-        # print(x.shape)
-        # x = self.linear3(x)
-        # print(x.shape)
 
         if self.decoder:
-            # print('Passing decoder')
             x_reconstruct = x
             x_reconstruct = self.decoder_1(x_reconstruct)
             x_reconstruct = F.relu(x_reconstruct)
@@ -268,7 +218,7 @@ class GAT(torch.nn.Module):
             ## the two layer shallow FC network
             x_parallel = self.parallel_linear1(x_parallel)
             x_parallel = F.relu(x_parallel)
-            # x = F.dropout(x, p=self.dropout_rate, training=self.training)
+
             x_parallel = self.parallel_linear2(x_parallel)
             x_parallel = F.relu(x_parallel)
 
@@ -407,12 +357,6 @@ class GCN(torch.nn.Module):
         return(torch.Tensor(batch_index).type(torch.int64))
         
     def forward(self, x, edge_index, edge_weight):
-        # x = torch.cat([x, pos], dim=-1)
-        
-        # print("Input data shape")
-        # print(x.shape)
-        # print(edge_index.shape)
-
         batches = x.shape[0]
         num_node = x.shape[1]
         
@@ -427,26 +371,20 @@ class GCN(torch.nn.Module):
             ## separate mirna from the rest
             x_cnv = x_cnv[:,:-100]
             x_exp = x_exp_mirna[:,:-100]
-            # print(x_cnv.shape)
-            # print(x_exp.shape)
+
             x_cnv = x_cnv.view(batches,-1,1)
             x_exp = x_exp.view(batches,-1,1)
             x_gene = torch.cat([x_exp,x_cnv],dim=1)
             x_gene = x_gene.view(-1,self.num_features)
             x_mirna = x_exp_mirna[:,-100:]
-            # print(x_mirna.shape)
             x_mirna = torch.flatten(x_mirna)
             x_mirna = x_mirna.view(-1, 1)
 
-            # print(x_gene.shape)
             x_gene = self.pre_conv_linear_gene(x_gene)
             x_gene = F.relu(x_gene)
-            # print(x_gene.shape)
 
-            # print(x_mirna.shape)
             x_mirna = self.pre_conv_linear_mirna(x_mirna)
             x_mirna = F.relu(x_mirna)
-            # print(x_mirna.shape)
 
             x_gene = x_gene.view(batches, -1, self.raised_dimension)
             x_mirna = x_mirna.view(batches, -1, self.raised_dimension)
@@ -456,7 +394,6 @@ class GCN(torch.nn.Module):
 
 
         x_parallel = x
-        # print(x.shape)
         x = x.view(-1, self.raised_dimension)
         x_parallel = x_parallel.view(batches,-1)
 
@@ -470,13 +407,10 @@ class GCN(torch.nn.Module):
             x = F.relu(x)
 
         if self.edge_weights:
-            # print('Passing through Conv2 layer with edge_weight.')
             x = self.conv2(x, edge_index, edge_weight)
 
             x = F.relu(x)
-            
         else:
-            # print('Passing through Conv2 layer without edge_weight.')
             x = self.conv2(x, edge_index) ## output shape: [batches * num_node, hid * head]
 
             x = F.relu(x)
@@ -488,7 +422,7 @@ class GCN(torch.nn.Module):
 
         if self.method == 'gcn':
             x = x.view(-1, self.hid) ## output shape:[batches * floor(num_node / poolsize), hid]
-        
+
         x = x.view(batches, -1) ## output size: [batches, floor(num_node / poolsize) * hid * head]
         x = self.linear1(x)
         x = F.relu(x)
@@ -496,7 +430,6 @@ class GCN(torch.nn.Module):
         x = F.relu(x)
 
         if self.decoder:
-            # print('Passing decoder')
             x_reconstruct = x
             x_reconstruct = self.decoder_1(x_reconstruct)
             x_reconstruct = F.relu(x_reconstruct)
@@ -534,8 +467,6 @@ class GCN(torch.nn.Module):
                 x_target_exp = x_target_exp_mirna[:,:-100]
                 x_target_mirna = x_target_exp_mirna[:,-100:]
                 x_target_flatten = torch.cat([x_target_exp, x_target_cnv, x_target_mirna], dim=1)
-                # print(x_reconstruct.shape)
-                # print(x_target_flatten.shape)
                 loss1 = nn.MSELoss()(x_reconstruct, x_target_flatten)
         else:
             loss1 = 0
@@ -600,8 +531,6 @@ class Baseline(torch.nn.Module):
         self.parallel_linear1 = nn.Linear(parallel_input, parallel_input//2)
         self.parallel_linear2 = nn.Linear(parallel_input//2, parallel_input//4)
         self.parallel_linear3 = nn.Linear(parallel_input//4, self.concate_layer)
-        # self.parallel_linear3 = nn.Linear(parallel_input//4, parallel_input//8)
-        # self.parallel_linear4 = nn.Linear(parallel_input//8, self.concate_layer)
         self.classifier = nn.Linear(self.concate_layer, num_classes)
     
     ## create the batch index for each nodes in the batch
@@ -627,26 +556,20 @@ class Baseline(torch.nn.Module):
             ## separate mirna from the rest
             x_cnv = x_cnv[:,:-100]
             x_exp = x_exp_mirna[:,:-100]
-            # print(x_cnv.shape)
-            # print(x_exp.shape)
+
             x_cnv = x_cnv.view(batches,-1,1)
             x_exp = x_exp.view(batches,-1,1)
             x_gene = torch.cat([x_exp,x_cnv],dim=1)
             x_gene = x_gene.view(-1,self.num_features)
             x_mirna = x_exp_mirna[:,-100:]
-            # print(x_mirna.shape)
             x_mirna = torch.flatten(x_mirna)
             x_mirna = x_mirna.view(-1, 1)
 
-            # print(x_gene.shape)
             x_gene = self.pre_conv_linear_gene(x_gene)
             x_gene = F.relu(x_gene)
-            # print(x_gene.shape)
 
-            # print(x_mirna.shape)
             x_mirna = self.pre_conv_linear_mirna(x_mirna)
             x_mirna = F.relu(x_mirna)
-            # print(x_mirna.shape)
 
             x_gene = x_gene.view(batches, -1, self.raised_dimension)
             x_mirna = x_mirna.view(batches, -1, self.raised_dimension)
