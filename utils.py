@@ -22,7 +22,6 @@ def high_variance_expression_gene(expression_variance_path, non_null_path, num_g
         gene_list_index = gene_variance_non_null.nlargest(num_gene, 'variance').index
     else:
         ## load expression data
-        # print(gene_variance['variance'])
         gene_list = gene_variance.nlargest(num_gene, 'variance').index
         gene_variance.index = range(gene_variance.shape[0])
         gene_list_index = gene_variance.nlargest(num_gene, 'variance').index
