@@ -82,20 +82,20 @@ print('Current arguments:')
 print(args)
 
 path = 'data/cancer/'
-# name_data = 'MNISTSuperpix'
-# dataset = MNISTSuperpixels(path, True, transform=T.Cartesian())
-# dataset.transform = T.NormalizeFeatures()
 
-expression_data_path = path + 'standardized_expression_data_with_labels.tsv'
-cnv_data_path = path + 'standardized_cnv_data_with_labels.tsv'
-mirna_data_path = path +'top_100_mirna_data.tsv'
 expression_variance_path = path + 'expression_variance.tsv'
 non_null_index_path = path + 'biogrid_non_null.csv'
 if args.cancer_subtype:
     if args.specific_type.lower() == 'brca':
         shuffle_index_path = path + 'brca_shuffle_index.tsv'
         cancer_subtype_label_path = path + 'brca_subtype.csv'
+        expression_data_path = path + 'expression_data_brca.tsv'
+        cnv_data_path = path + 'cnv_data_brca.tsv'
+        mirna_data_path = path +'mirna_data_brca.tsv'
 else:
+    expression_data_path = path + 'standardized_expression_data_with_labels.tsv'
+    cnv_data_path = path + 'standardized_cnv_data_with_labels.tsv'
+    mirna_data_path = path +'top_100_mirna_data.tsv'
     shuffle_index_path = path + 'common_trimmed_shuffle_index_'+ str(args.shuffle_index) + '.tsv'
 adjacency_matrix_path = path + 'adj_matrix_biogrid.npz'
 mirna_to_gene_matrix_path = path + 'standardized_mirna_mrna_edge_filtered_at_eight_with_top_100_mirna.npz'
