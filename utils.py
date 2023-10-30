@@ -97,14 +97,10 @@ def down_sampling_exp_and_real_mirna_data(expression_variance_path,
     if omic_mode > 0:
         mirna_data.index = range(mirna_data.shape[0])
         data = pd.concat([expression_data, mirna_data], axis=1)
-    # print(data.shape)
-    # print(mirna_influence_data.shape)
-    # print(expression_data.shape)
         num_samples = mirna_data.shape[0]
     ## concatenate expr and mirna
         data = np.asarray(data).reshape(num_samples, -1 ,1)
         print(data.shape)
-    # data = np.concatenate([data, np.asarray(expression_data).reshape(num_samples, -1, 1) ], axis = 2)
     else:
         data = np.asarray(expression_data).reshape(expression_data.shape[0], -1 ,1)
 
@@ -122,12 +118,7 @@ def down_sampling_exp_and_real_mirna_data(expression_variance_path,
     if mirna_gene or mirna_mirna:
         mirna_gene_adj = sp.load_npz(mirna_to_gene_matrix_path)
         mirna_gene_adj = mirna_gene_adj.todense()
-        # gene_gene_adj_selected = edge_filter(gene_gene_adj_selected)
-        # print(gene_gene_adj_selected.shape)
         mirna_gene_adj_selected = mirna_gene_adj[high_variance_gene_index,:]
-        # print(mirna_gene_adj_selected.shape)
-        # mirna_gene_adj_selected = edge_filter(np.transpose(mirna_gene_adj_selected))
-        # mirna_gene_adj_selected = np.transpose(mirna_gene_adj_selected)
     else:
         mirna_gene_adj_selected = np.zeros((number_gene,100))
 
@@ -153,10 +144,7 @@ def down_sampling_exp_and_real_mirna_data(expression_variance_path,
     elif omic_mode == 1:
         supra_adj = sp.csr_matrix(get_mirna_inner_connection(mirna_gene_adj_selected))
 
-
-    # del features['iCluster']
     shuffle_index = pd.read_csv(shuffle_index_path, sep='\t', index_col=0, header=0)
-    # print(shuffle_index.shape)
     
     return supra_adj, np.asarray(data), labels.to_numpy(), shuffle_index.to_numpy()
 
@@ -183,15 +171,12 @@ def down_sampling_exp_cnv_and_real_mirna_data(expression_variance_path,
     
     if expression_data.shape[0] == mirna_data.shape[0]:
         print('Exp and miRNA sample numbers match.')
-    # print(mirna_influence_data.shape)
     ## filter multi-omics data by gene list
     expression_data = expression_data.loc[:,high_variance_gene_list]
     cnv_data = cnv_data.loc[:,high_variance_gene_list]
     expression_data.index = range(expression_data.shape[0])
     mirna_data.index = range(mirna_data.shape[0])
     cnv_data.index = range(cnv_data.shape[0])
-    # print(expression_data.shape)
-    # print(mirna_data.shape)
 
     ##  only pad CNV data when using Exp, CNV and miRNA
     if omic_mode == 4:
@@ -200,9 +185,6 @@ def down_sampling_exp_cnv_and_real_mirna_data(expression_variance_path,
 
         data = pd.concat([expression_data, mirna_data], axis=1)
         
-        # print(data.shape)
-        # print(mirna_influence_data.shape)
-        # print(expression_data.shape)
         num_samples = mirna_data.shape[0]
         ## concatenate expr and mirna
         data= np.asarray(data).reshape(num_samples, -1 ,1)
@@ -217,7 +199,6 @@ def down_sampling_exp_cnv_and_real_mirna_data(expression_variance_path,
         print(data.shape)
         data = np.concatenate([data,cnv_data], axis=2)
         print(data.shape)
-    # data = np.concatenate([data, np.asarray(expression_data).reshape(num_samples, -1, 1) ], axis = 2)
 
     ## load adjacency matrix
     if gene_gene:
@@ -233,12 +214,7 @@ def down_sampling_exp_cnv_and_real_mirna_data(expression_variance_path,
     if mirna_gene or mirna_mirna:
         mirna_gene_adj = sp.load_npz(mirna_to_gene_matrix_path)
         mirna_gene_adj = mirna_gene_adj.todense()
-        # gene_gene_adj_selected = edge_filter(gene_gene_adj_selected)
-        # print(gene_gene_adj_selected.shape)
         mirna_gene_adj_selected = mirna_gene_adj[high_variance_gene_index,:]
-        # print(mirna_gene_adj_selected.shape)
-        # mirna_gene_adj_selected = edge_filter(np.transpose(mirna_gene_adj_selected))
-        # mirna_gene_adj_selected = np.transpose(mirna_gene_adj_selected)
     else:
         mirna_gene_adj_selected = np.zeros((number_gene,100))
 
